@@ -1,5 +1,10 @@
 import { type Manifest, addonBuilder } from "stremio-addon-sdk";
-import { NewznabAPIResponse } from "./providers/newznab";
+import {
+  NewznabAPIResponse,
+  generate_newznab_api_url,
+} from "./providers/newznab";
+import { parse_container_title } from "./util/parseContainerTitles";
+import { filesize } from "filesize";
 
 // Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md
 const manifest: Manifest = {
@@ -14,12 +19,9 @@ const manifest: Manifest = {
 };
 const builder = new addonBuilder(manifest);
 
-// https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
-const newznab_api = `${process.env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${process.env.NEWZNAB_API_KEY}`;
-const generate_newznab_api_url = (type: string, id: string) => {
-  return newznab_api
-    .replace(/\{type\}/g, type)
-    .replace(/\{id\}/g, id.replace(/[^0-9]+/g, ""));
+type AddonItem = ReturnType<typeof parse_container_title> & {
+  url: string;
+  size: string;
 };
 
 builder.defineStreamHandler(async ({ type, id }) => {
@@ -38,7 +40,25 @@ builder.defineStreamHandler(async ({ type, id }) => {
     }
   })()) as NewznabAPIResponse;
 
-  console.log(newznab_api_result.item[0]);
+  const items = newznab_api_result.channel.item
+    .map<AddonItem[]>((item) => {
+      return {
+        ...parse_container_title(item.title),
+        url: item.enclosure["@attributes"].url,
+        size: filesize(+item.enclosure["@attributes"].length),
+      };
+    })
+    .filter((item) => item.title)
+    // test one result per quality
+    .reduce<ReturnType<typeof parse_container_title>[]>(
+      (acc, curr, index, arr) => {
+        if (arr.find((v) => v.quality !== curr.quality)) acc.push(curr);
+        return acc;
+      },
+      []
+    );
+
+  console.log(items);
 
   // Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/requests/defineStreamHandler.md
   if (type === "movie" && id === "tt1254207") {

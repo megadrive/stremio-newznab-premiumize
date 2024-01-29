@@ -15,6 +15,7 @@ type NewznabAPIInfo = {
       link: string;
       description: string;
     };
+    item: NewznabAPIItem[];
   };
 };
 
@@ -48,5 +49,12 @@ export type NewznabAPIResponse = NewznabAPIInfo & {
       total: string;
     };
   };
-  item: NewznabAPIItem[];
+};
+
+// https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
+const newznab_api = `${process.env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${process.env.NEWZNAB_API_KEY}`;
+export const generate_newznab_api_url = (type: string, id: string) => {
+  return newznab_api
+    .replace(/\{type\}/g, type)
+    .replace(/\{id\}/g, id.replace(/[^0-9]+/g, ""));
 };
