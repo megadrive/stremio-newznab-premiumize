@@ -41,9 +41,13 @@ builder.defineStreamHandler(async ({ type, id }) => {
   })()) as NewznabAPIResponse;
 
   const items = newznab_api_result.channel.item
-    .map<AddonItem[]>((item) => {
+    .map<AddonItem>((item) => {
+      let parsed_title = parse_container_title(item.title) ?? {
+        title: "",
+        quality: "",
+      };
       return {
-        ...parse_container_title(item.title),
+        ...parsed_title,
         url: item.enclosure["@attributes"].url,
         size: filesize(+item.enclosure["@attributes"].length),
       };
