@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
-import { config } from "dotenv";
-config();
-
 import { serveHTTP, publishToCentral } from "stremio-addon-sdk";
 import addonInterface from "./addon";
+import { env } from "./env";
 serveHTTP(addonInterface, {
-  port: process.env.PORT ? +process.env.PORT : 55932,
+  port: env.PORT,
 });
 
 // when you've deployed your addon, un-comment this line

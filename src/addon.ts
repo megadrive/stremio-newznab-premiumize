@@ -1,5 +1,6 @@
 import { type Manifest, addonBuilder } from "stremio-addon-sdk";
 import { NewznabAPIResponse } from "./providers/newznab";
+import { env } from "./env";
 
 // Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md
 const manifest: Manifest = {
@@ -15,7 +16,7 @@ const manifest: Manifest = {
 const builder = new addonBuilder(manifest);
 
 // https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
-const newznab_api = `${process.env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${process.env.NEWZNAB_API_KEY}`;
+const newznab_api = `${env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${env.NEWZNAB_API_KEY}`;
 const generate_newznab_api_url = (type: string, id: string) => {
   return newznab_api
     .replace(/\{type\}/g, type)
