@@ -14,5 +14,5 @@ export const env = cleanEnv(process.env, {
   DATABASE_URL: str({ default: "file:./database.sqlite" }),
 
   PORT: num({ default: 55932 }),
-  BASE_URL: str({ devDefault: "http://127.0.0.1:55932" }),
+  BASE_URL: str({ default: "http://127.0.0.1:55932" }),
 });

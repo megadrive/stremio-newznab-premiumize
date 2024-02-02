@@ -1,6 +1,6 @@
 import { type Manifest, addonBuilder } from "stremio-addon-sdk";
 import { newznab } from "./providers/newznab";
-import { env } from "env";
+import { env } from "./env";
 
 // Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md
 const manifest: Manifest = {
