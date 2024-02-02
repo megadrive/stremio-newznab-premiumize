@@ -1,4 +1,14 @@
+import { regex } from "../consts";
 import { env } from "../env";
+import { regex_exec } from "../util";
+import { CinemetaError, cinemeta } from "./cinemeta";
+
+const Qualities = {
+  "4k": ["4k", "2160p", "UHD"],
+  "1080p": ["1080p", "HD"],
+  "720p": ["720p"],
+  "480p": ["480p"],
+} as const;
 
 type NewznabAPIInfo = {
   "@attributes": {
@@ -17,6 +27,7 @@ type NewznabAPIInfo = {
       link: string;
       description: string;
     };
+    item: NewznabAPIItem[];
   };
 };
 
@@ -50,10 +61,8 @@ export type NewznabAPIResponse = NewznabAPIInfo & {
       total: string;
     };
   };
-  item: NewznabAPIItem[];
 };
 
-class CinemetaError extends Error {}
 class NZBFetchGetError extends Error {}
 
 // https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
@@ -66,50 +75,129 @@ const generate_api_url = async (
   type: "movie" | "series" | string,
   id: string
 ) => {
-  let rv: string | undefined = undefined;
+  let url: string | undefined = undefined;
+
   if (type === "movie") {
-    rv = Newznab_URLs.movies
+    url = Newznab_URLs.movies
       .replace(/\{type\}/g, type)
       .replace(/\{id\}/g, id.replace(/[^0-9]+/g, ""));
   }
 
   if (type === "series") {
     try {
-      const res = await fetch(
-        `https://v3-cinemeta.strem.io/meta/movie/${id}.json`
-      );
-      if (!res.ok) throw new CinemetaError("Couldn't fetch Cinemeta info.");
-      const name = (await res.json()).meta.name as string;
-      rv = Newznab_URLs.search.replace(/\{query\}/g, name);
+      const meta = await cinemeta.get(type, id);
+      const name = meta.name;
+      url = Newznab_URLs.search.replace(/\{query\}/g, name);
     } catch (error) {
       console.log(error);
     }
   }
 
-  console.log(`Generated URL: ${rv ?? ""}`);
-  return rv;
+  console.log(`Generated URL: ${url ?? "something happened and it broke rip"}`);
+  return url;
 };
 
-const headers = {
+const fetch_headers = {
   "Cache-Control": "maxage=3600, stale-while-revalidate",
 };
 
-export const newznab = {
-  get: async (type: string, id: string) => {
-    try {
-      const url = await generate_api_url(type, id);
-      if (!url) throw new NZBFetchGetError("Couldn't generate Newznab URL.");
+/**
+ * Parses the title for information, optionally getting Cinemeta info.
+ * @param title The Newznab API provided title
+ */
+const parse_api_result = (
+  item: NewznabAPIItem,
+  imdb_id: string
+): {
+  imdb_id: string;
+  title: string;
+  quality: keyof typeof Qualities | string; // TODO: figure out how to remove the | string
+  url: string;
+} => {
+  const title = item.title;
+  const [quality] = regex_exec(regex.quality.exec(item.title), [0]);
+  const url = item.link;
 
-      const res = await fetch(url, {
-        headers,
-        method: "GET",
+  console.log({ imdb_id, title, quality, url });
+
+  return {
+    imdb_id,
+    title,
+    quality,
+    url,
+  };
+};
+
+/**
+ * Gets a set of results based on an IMDB ID
+ * @param type Type provided by Stremio
+ * @param id IMDB ID provided by Stremio
+ */
+const get = async (type: "movie" | "series" | string, id: string) => {
+  try {
+    const url = await generate_api_url(type, id);
+    if (!url)
+      throw new NZBFetchGetError(
+        `Couldn't generate Newznab URL: ${{ type, id }}`
+      );
+
+    const res = await fetch(url, {
+      headers: fetch_headers,
+      method: "GET",
+    });
+    if (!res.ok) throw new NZBFetchGetError(url);
+
+    const json = (await res.json()) as NewznabAPIResponse;
+    return json;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+/**
+ * Gets a set of items with parsed titles.
+ * @param type Type provided by Stremio
+ * @param id IMDB ID provided by Stremio
+ */
+const getItems = async (type: "movie" | "series" | string, id: string) => {
+  try {
+    const api_result = await get(type, id);
+
+    if (!api_result) throw new NZBFetchGetError("No results");
+
+    return api_result.channel.item.map((item) => parse_api_result(item, id));
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const limit = (
+  items: ReturnType<typeof parse_api_result>[],
+  opts: {
+    limit_per_quality: number;
+    limit_qualities: (keyof typeof Qualities)[];
+    limit_languages: string[];
+  } = {
+    limit_per_quality: 2,
+    limit_qualities: ["4k"],
+    limit_languages: [],
+  }
+) => {
+  const qualitiesFilter = (item: (typeof items)[0]) => {
+    return opts.limit_qualities.map((limited_quality) => {
+      return Qualities[limited_quality].some((q) => {
+        return item.quality?.includes(q);
       });
-      if (!res.ok) throw new NZBFetchGetError();
+    });
+  };
 
-      const json = await res.json();
-      return json as NewznabAPIResponse;
-    } catch (error) {
-      console.error(error);
-    }
-  },
+  const filtered = items.filter(qualitiesFilter);
+  return filtered;
+};
+
+export const newznab = {
+  get,
+  getItems,
+
+  limit,
 };
