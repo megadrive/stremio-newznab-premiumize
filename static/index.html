@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Newznab Premiumize</title>
+    <style>
+      .form-input {
+        display: flex;
+        gap: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="form-input">
+        <div>Newznab Api key:</div>
+        <div>
+          <input type="text" id="newznab_apikey" name="newznab_apikey" />
+        </div>
+      </div>
+      <div class="form-input">
+        <div>Premiumize Api key:</div>
+        <div>
+          <input type="text" id="premiumize" name="newznab_apikey" />
+        </div>
+      </div>
+      <div><button id="install">Install</button></div>
+      <div id="stremio-install-link"></div>
+    </div>
+    <script>
+      const installButton = (document.getElementById("install").onclick =
+        generate_url);
+
+      function generate_url() {
+        const settings = {
+          premiumize: document.getElementById("newznab_apikey").value,
+          newznab_key: document.getElementById("newznab_apikey").value,
+          newznab_provider: "nzbgeek",
+        };
+
+        document.getElementById(
+          "stremio-install-link"
+        ).innerText = `stremio://127.0.0.1:55932/${btoa(
+          JSON.stringify(settings)
+        )}/manifest.json`;
+      }
+    </script>
+  </body>
+</html>

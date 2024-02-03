@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "description": "Gets NZBs from a Newznab API and serves it to Premiumize.",
   "scripts": {
-    "start": "tsc && node dist/server.js"
+    "copy-static": "copyfiles \"static/*\" dist",
+    "start": "tsc && npm run copy-static && node ./dist/server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.8.1",
+    "copyfiles": "^2.4.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "envalid": "^8.0.0",

@@ -1,3 +1,4 @@
+import { type UserSettings } from "consts";
 import nameToImdb from "name-to-imdb";
 import { promisify } from "util";
 export const name_to_imdb = promisify(nameToImdb);
@@ -30,4 +31,13 @@ export const parse_imdb_id = (imdb_id: string): ParsedStremioID => {
   if (season) rv.season = +season;
   if (episode) rv.episode = +episode;
   return rv;
+};
+
+export const user_settings = {
+  encode: (settings: Record<string, any>): string => {
+    return btoa(JSON.stringify(settings));
+  },
+  decode: (settings: string): UserSettings => {
+    return JSON.parse(atob(settings));
+  },
 };

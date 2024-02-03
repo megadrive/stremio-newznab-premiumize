@@ -72,13 +72,14 @@ class NZBFetchGetError extends Error {}
 
 // https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
 const Newznab_URLs = {
-  movies: `${env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${env.NEWZNAB_API_KEY}`,
-  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={name} S{season} E{episode}&cat=5000&limit=50&extended=1&o=json&apikey=${env.NEWZNAB_API_KEY}`,
+  movies: `${env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey={apikey}`,
+  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={name} S{season} E{episode}&cat=5000&limit=50&extended=1&o=json&apikey={apikey}`,
 };
 
 const generate_api_url = async (
   type: "movie" | "series" | string,
-  id: ParsedStremioID
+  id: ParsedStremioID,
+  apikey: string
 ) => {
   let url: string | undefined = undefined;
 
@@ -105,6 +106,8 @@ const generate_api_url = async (
     }
   }
 
+  url = url ? url.replace(/\{apikey\}/, apikey) : url;
+
   console.log(`Generated URL: ${url ?? "something happened and it broke rip"}`);
   return url;
 };
@@ -114,7 +117,7 @@ const fetch_headers = {
 };
 
 /**
- * Parses the title for information, optionally getting Cinemeta info.
+ * Parses the title for information
  * @param title The Newznab API provided title
  */
 const parse_api_result = (
@@ -130,7 +133,6 @@ const parse_api_result = (
   // const [quality] = regex_exec(regex.quality.exec(item.title), [0]);
   let quality: keyof typeof Qualities | undefined = undefined;
   for (const qual in Qualities) {
-    console.log(qual, Qualities[qual]);
     if (
       Qualities[qual].some((q) => {
         return title.toLowerCase().includes(q.toLowerCase());
@@ -154,9 +156,13 @@ const parse_api_result = (
  * @param type Type provided by Stremio
  * @param id IMDB ID provided by Stremio
  */
-const get = async (type: "movie" | "series" | string, id: ParsedStremioID) => {
+const get = async (
+  type: "movie" | "series" | string,
+  id: ParsedStremioID,
+  apikey: string
+) => {
   try {
-    const url = await generate_api_url(type, id);
+    const url = await generate_api_url(type, id, apikey);
     console.log(`Fetching ${url}`);
     if (!url)
       throw new NZBFetchGetError(
@@ -183,10 +189,11 @@ const get = async (type: "movie" | "series" | string, id: ParsedStremioID) => {
  */
 const getItems = async (
   type: "movie" | "series" | string,
-  id: ParsedStremioID
+  id: ParsedStremioID,
+  apikey: string
 ) => {
   try {
-    const api_result = await get(type, id);
+    const api_result = await get(type, id, apikey);
 
     if (!api_result) throw new NZBFetchGetError("No results");
 
