@@ -1,14 +1,19 @@
 import { regex } from "../consts";
 import { env } from "../env";
-import { regex_exec } from "../util";
+import { ParsedStremioID, regex_exec } from "../util";
 import { CinemetaError, cinemeta } from "./cinemeta";
 
-const Qualities = {
+type TQualities = Record<
+  string,
+  ("4k" | "2160p" | "1080p" | "720p" | "480p" | "DVDRip" | "UHD" | "HD")[]
+>;
+const Qualities: TQualities = {
   "4k": ["4k", "2160p", "UHD"],
   "1080p": ["1080p", "HD"],
   "720p": ["720p"],
   "480p": ["480p"],
-} as const;
+  DVDRIP: ["DVDRip"],
+};
 
 type NewznabAPIInfo = {
   "@attributes": {
@@ -68,26 +73,33 @@ class NZBFetchGetError extends Error {}
 // https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
 const Newznab_URLs = {
   movies: `${env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey=${env.NEWZNAB_API_KEY}`,
-  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={query}&cat=5000&limit=50&extended=1&o=json&apikey=${env.NEWZNAB_API_KEY}`,
+  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={name} S{season} E{episode}&cat=5000&limit=50&extended=1&o=json&apikey=${env.NEWZNAB_API_KEY}`,
 };
 
 const generate_api_url = async (
   type: "movie" | "series" | string,
-  id: string
+  id: ParsedStremioID
 ) => {
   let url: string | undefined = undefined;
 
   if (type === "movie") {
     url = Newznab_URLs.movies
       .replace(/\{type\}/g, type)
-      .replace(/\{id\}/g, id.replace(/[^0-9]+/g, ""));
+      .replace(/\{id\}/g, id.id.replace(/[^0-9]+/g, ""));
   }
 
   if (type === "series") {
     try {
-      const meta = await cinemeta.get(type, id);
+      const meta = await cinemeta.get(type, id.id);
       const name = meta.name;
-      url = Newznab_URLs.search.replace(/\{query\}/g, name);
+      const season =
+        id.season && id.season < 10 ? "0" + id.season : `${id.season}`;
+      const episode =
+        id.episode && id.episode < 10 ? "0" + id.episode : `${id.episode}`;
+      url = Newznab_URLs.search
+        .replace(/\{name\}/g, name)
+        .replace(/\{season\}/g, season)
+        .replace(/\{episode\}/g, episode);
     } catch (error) {
       console.log(error);
     }
@@ -111,14 +123,23 @@ const parse_api_result = (
 ): {
   imdb_id: string;
   title: string;
-  quality: keyof typeof Qualities | string; // TODO: figure out how to remove the | string
+  quality?: keyof typeof Qualities | string; // TODO: figure out how to remove the | string
   url: string;
 } => {
   const title = item.title;
-  const [quality] = regex_exec(regex.quality.exec(item.title), [0]);
+  // const [quality] = regex_exec(regex.quality.exec(item.title), [0]);
+  let quality: keyof typeof Qualities | undefined = undefined;
+  for (const qual in Qualities) {
+    console.log(qual, Qualities[qual]);
+    if (
+      Qualities[qual].some((q) => {
+        return title.toLowerCase().includes(q.toLowerCase());
+      })
+    ) {
+      quality = qual;
+    }
+  }
   const url = item.link;
-
-  console.log({ imdb_id, title, quality, url });
 
   return {
     imdb_id,
@@ -133,9 +154,10 @@ const parse_api_result = (
  * @param type Type provided by Stremio
  * @param id IMDB ID provided by Stremio
  */
-const get = async (type: "movie" | "series" | string, id: string) => {
+const get = async (type: "movie" | "series" | string, id: ParsedStremioID) => {
   try {
     const url = await generate_api_url(type, id);
+    console.log(`Fetching ${url}`);
     if (!url)
       throw new NZBFetchGetError(
         `Couldn't generate Newznab URL: ${{ type, id }}`
@@ -159,13 +181,16 @@ const get = async (type: "movie" | "series" | string, id: string) => {
  * @param type Type provided by Stremio
  * @param id IMDB ID provided by Stremio
  */
-const getItems = async (type: "movie" | "series" | string, id: string) => {
+const getItems = async (
+  type: "movie" | "series" | string,
+  id: ParsedStremioID
+) => {
   try {
     const api_result = await get(type, id);
 
     if (!api_result) throw new NZBFetchGetError("No results");
 
-    return api_result.channel.item.map((item) => parse_api_result(item, id));
+    return api_result.channel.item.map((item) => parse_api_result(item, id.id));
   } catch (error) {
     console.error(error);
   }

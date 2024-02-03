@@ -11,11 +11,23 @@ export const regex_exec = (
   matcher: ReturnType<RegExp["exec"]>,
   matches_to_return: number[]
 ) => {
-  console.log(matcher);
   return matcher ? matches_to_return.map((m) => matcher[m]) : [];
 };
 
-export const parse_imdb_id = (imdb_id: string) => {
-  const [id, season, episode] = imdb_id.split(";");
-  return { id, season, episode };
+export type ParsedStremioID = {
+  id: string;
+  type: "movie" | "series";
+  season?: number;
+  episode?: number;
+};
+
+export const parse_imdb_id = (imdb_id: string): ParsedStremioID => {
+  const [id, season, episode] = imdb_id.split(":");
+  const rv: ParsedStremioID = {
+    id,
+    type: season && episode ? "series" : "movie",
+  };
+  if (season) rv.season = +season;
+  if (episode) rv.episode = +episode;
+  return rv;
 };
