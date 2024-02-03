@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-import { serveHTTP, publishToCentral } from "stremio-addon-sdk";
-import addonInterface from "./addon";
+import expressApp from "./addon";
 import { env } from "./env";
-serveHTTP(addonInterface, {
-  port: env.PORT,
+expressApp.listen(env.PORT, () => {
+  console.log(
+    `HTTP addon accessible at: http://127.0.0.1:${env.PORT}/manifest.json`
+  );
 });
 
 // when you've deployed your addon, un-comment this line

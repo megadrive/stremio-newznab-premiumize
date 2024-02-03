@@ -1,7 +1,12 @@
-import { type Manifest, addonBuilder } from "stremio-addon-sdk";
-import { newznab } from "./providers/newznab";
 import { env } from "./env";
+import express from "express";
+import cors from "cors";
+import { type Manifest } from "stremio-addon-sdk";
+import { newznab } from "./providers/newznab";
 import { parse_imdb_id } from "./util";
+
+const app = express();
+app.use(cors());
 
 // Docs: https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md
 const manifest: Manifest & {
@@ -14,7 +19,6 @@ const manifest: Manifest & {
   }[];
   behaviorHints: {
     configurable: boolean;
-    configurationRequired: boolean;
   };
 } = {
   id: "community.stremionewznabpremiumize",
@@ -27,43 +31,45 @@ const manifest: Manifest & {
   idPrefixes: ["tt"],
   behaviorHints: {
     configurable: true,
-    configurationRequired: true,
   },
-  config: [
-    {
-      key: "premiumize_api_key",
-      type: "password",
-    },
-    {
-      key: "newznab_api_key",
-      type: "password",
-    },
-    { key: "newznab_api_path", type: "text", default: env.NEWZNAB_API_BASEURL },
-  ],
 };
-const builder = new addonBuilder(manifest);
 
-builder.defineStreamHandler(async ({ type, id }) => {
+app.get("/", (req, res) => {
+  return res.redirect("/configure");
+});
+
+app.get("/configure", (req, res) => {
+  return res.send("Configuration page here");
+});
+
+app.get("/:settings/manifest.json", (req, res) => {
+  const new_manifest = Object.assign({}, manifest);
+
+  return res.json(manifest);
+});
+
+app.get("/:settings/stream/:type/:id.json", async (req, res) => {
+  const { type, id } = req.params;
   console.log("request for streams: " + type + " " + id);
   const parsed_id = parse_imdb_id(id);
 
-  const newznab_api_result = await newznab.getItems(type, parsed_id);
+  const api_result = await newznab.getItems(type, parsed_id);
 
-  if (!newznab_api_result) return Promise.resolve({ streams: [] });
+  if (!api_result) return { streams: [] };
 
   // parse down the streams to x per result
-  const limited_results = newznab.limit(newznab_api_result);
+  const limited_results = newznab.limit(api_result);
   if (limited_results.length === 0) {
-    return Promise.resolve({ streams: [] });
+    return res.json({ streams: [] });
   }
 
-  return {
+  return res.json({
     streams: limited_results.map((result) => ({
       name: `NZB2PM\n${result.quality}`,
       title: result.title,
       url: `${env.BASE_URL}/premiumize/${Math.random() * 102312}`,
     })),
-  };
+  });
 });
 
-export default builder.getInterface();
+export default app;
