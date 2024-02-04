@@ -5,6 +5,12 @@ import { type Manifest } from "stremio-addon-sdk";
 import { newznab } from "./providers/newznab";
 import { parse_imdb_id, user_settings } from "./util";
 import { join } from "path";
+import {
+  PremiumizeAPI_TransferCreate,
+  premiumize_api,
+  type PremiumizeAPI_DirectDL,
+  type PremiumizeAPI_TransferList,
+} from "./providers/premiumize";
 
 const app = express();
 app.use(cors());
@@ -67,96 +73,56 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
     return res.json({ streams: [] });
   }
 
-  return res.json({
+  const results = {
     streams: limited_results.map((result) => ({
       name: `NZB2PM\n${result.quality}`,
       title: result.title,
-      url: `${env.BASE_URL}/p/${encodeURIComponent(result.url)}`,
+      description: `💾 ${result.size}`,
+      url: `${env.BASE_URL}/p/${parsed_settings.premiumize}/${btoa(
+        result.url
+      )}`,
     })),
-  });
+  };
+  console.log(results);
+  return res.json(results);
 });
 
-app.get("/p/:url", async (req, res) => {
-  const url = decodeURIComponent(req.params.url).replace(/&amp;/g, "&");
+app.get("/p/:premiumize/:url", async (req, res) => {
+  const apikey = req.params.premiumize;
+  const url = decodeURIComponent(atob(req.params.url)).replace(/&amp;/g, "&");
+
   console.log(`Creating a transfer for ${url}`); // @TODO: remove apikeys from console logs
-  const body = new URLSearchParams();
-  body.append("src", url);
 
-  const response = await fetch(
-    `${env.PREMIUMIZE_API_BASEURL}/transfer/create?apikey=${env.PREMIUMIZE_API_KEY}`,
-    {
-      method: "POST",
-      body,
-    }
+  // create a transfer
+  console.log("CREATE TRANSFER");
+  const createTransfer = (await premiumize_api.createTransfer(
+    url,
+    apikey
+  )) as PremiumizeAPI_TransferCreate;
+  console.log({ createTransfer });
+
+  // follow the transfer status
+  console.log("WAIT FOR COMPLETION");
+  try {
+    const complete = await premiumize_api.waitForTransferCompletion(
+      createTransfer.name,
+      apikey
+    );
+    console.log("all g");
+  } catch (error) {
+    console.log(`couldnt follow transfer status`);
+    console.log(error);
+  }
+
+  // once complete, do after-complete stuff
+  console.log("MOVE TRANSFER");
+  const file = await premiumize_api.moveTransferAfterCompletion(
+    createTransfer.name,
+    apikey
   );
-  if (response.ok) console.log("Premiumize accepted");
 
-  // wait for transfer to complete. ~1 minute total
-  let waiting = true;
-  const check_file_availability = async () => {
-    try {
-      console.log(`Checking for file ${url}`);
-      if (waiting) {
-        const transfer_res = await fetch(
-          `${env.PREMIUMIZE_API_BASEURL}/transfer/list?apikey=${env.PREMIUMIZE_API_KEY}`
-        );
-        if (!transfer_res.ok) {
-          console.log(
-            `${env.PREMIUMIZE_API_BASEURL}/transfer/list?apikey=${env.PREMIUMIZE_API_KEY}`
-          );
-          if (transfer_res.status === 404) console.log("404");
-          return;
-        }
-        const transfer = (await transfer_res.json()) as {
-          status: string;
-          transfers: {
-            id: string;
-            name: string;
-            status: string;
-            progress: number;
-            src: string;
-            folder_id: string;
-            file_id: string;
-          }[];
-        };
-        console.log(transfer);
-        const found = transfer.transfers.find((t) => t.src === url);
-        if (found?.status === "finished") {
-          const ddl_body = new URLSearchParams();
-          ddl_body.append("src", url);
-          const ddl = (await (
-            await fetch(`${env.PREMIUMIZE_API_BASEURL}/transfer/directdl`, {
-              method: "POST",
-              body: ddl_body,
-            })
-          ).json()) as {
-            status: string;
-            location: string;
-            filename: string;
-            filesize: number;
-            content: {
-              path: string;
-              size: number;
-              link: string;
-              stream_link: string;
-              transcode_status: string;
-            }[];
-          };
-
-          console.log(ddl);
-
-          return res.status(200).sendFile(ddl.location);
-        }
-      }
-    } catch (error) {
-      console.log("Couldn't serve a transfer");
-    }
-  };
-  const interval = setInterval(check_file_availability, 1000);
-  setTimeout(() => {
-    waiting = false;
-    clearInterval(interval);
-  }, 5 * 60 * 1000);
+  // serve the file babes
+  return res.redirect(file.stream_link);
 });
 
 export default app;

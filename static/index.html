@@ -22,7 +22,7 @@
       <div class="form-input">
         <div>Premiumize Api key:</div>
         <div>
-          <input type="text" id="premiumize" name="newznab_apikey" />
+          <input type="text" id="premiumize" name="premiumize" />
         </div>
       </div>
       <div><button id="install">Install</button></div>
@@ -34,7 +34,7 @@
 
       function generate_url() {
         const settings = {
-          premiumize: document.getElementById("newznab_apikey").value,
+          premiumize: document.getElementById("premiumize").value,
           newznab_key: document.getElementById("newznab_apikey").value,
           newznab_provider: "nzbgeek",
         };

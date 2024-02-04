@@ -9,7 +9,7 @@ export const env = cleanEnv(process.env, {
 
   PREMIUMIZE_API_BASEURL: url({ default: "https://www.premiumize.me/api" }),
   PREMIUMIZE_API_KEY: str(),
-  PREMIUMIZE_API_FOLDER: str({ default: "/stremio_nzbs" }),
+  PREMIUMIZE_API_FOLDER: str({ default: "stremio_nzbs" }),
 
   DATABASE_URL: str({ default: "file:./database.sqlite" }),
 

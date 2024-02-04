@@ -7,3 +7,13 @@ export type UserSettings = {
   newznab_key: string;
   newznab_provider: string;
 };
+
+export const video_filetypes = [
+  "webm",
+  "mkv",
+  "flv",
+  "f4v",
+  "vob",
+  "mp4",
+  "avi",
+];
