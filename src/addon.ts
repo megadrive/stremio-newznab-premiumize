@@ -80,14 +80,17 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
   }
 
   const results = {
-    streams: limited_results.map((result) => ({
-      name: `NZB2PM\n${result.quality ?? ""}`,
-      title: result.title,
-      description: `💾 ${result.size}`,
-      url: `${env.BASE_URL}/p/${parsed_settings.premiumize}/${btoa(
-        result.url
-      )}`,
-    })),
+    streams: limited_results.map((result) => {
+      const quality = result.quality ?? "";
+
+      return {
+        name: `NZB2PM\n${quality}`,
+        description: `${result.title}\n💾 ${result.size}`,
+        url: `${env.BASE_URL}/p/${parsed_settings.premiumize}/${btoa(
+          result.url
+        )}`,
+      };
+    }),
   };
   console.log(results);
   return res.json(results);
@@ -114,20 +117,27 @@ app.get("/p/:premiumize/:url", async (req, res) => {
       createTransfer.name,
       apikey
     );
-    console.log("all g");
+    if (complete) {
+      console.log("TRANSFER COMPLETE");
+    }
   } catch (error) {
     console.log(`couldnt follow transfer status`);
     console.log(error);
   }
 
   // once complete, do after-complete stuff
-  console.log("MOVE TRANSFER");
-  const file = await premiumize_api.moveTransferAfterCompletion(
-    createTransfer.name,
-    apikey
-  );
+  // console.log("MOVE TRANSFER");
+  // const file = await premiumize_api.moveTransferAfterCompletion(
+  //   createTransfer.name,
+  //   apikey
+  // );
+
+  console.log("GET MOVIE FILE");
+  const file = await premiumize_api.getFile(createTransfer.name, apikey);
 
   // serve the file babes
+  if (!file) return res.status(404).send("");
+
   return res.redirect(file.stream_link);
 });
 

@@ -2,6 +2,7 @@ import { regex } from "../consts";
 import { env } from "../env";
 import { ParsedStremioID, regex_exec } from "../util";
 import { CinemetaError, cinemeta } from "./cinemeta";
+import { filesize } from "filesize";
 
 type TQualities = Record<
   string,
@@ -73,7 +74,7 @@ class NZBFetchGetError extends Error {}
 // https://api.nzbgeek.info/api?t=movie&imdbid=08009314&limit=50&o=json&apikey=MA801QWu9MffN6uJpzAEGiu4jD5zgRUH
 const Newznab_URLs = {
   movies: `${env.NEWZNAB_API_BASEURL}/api?t={type}&imdbid={id}&limit=50&o=json&apikey={apikey}`,
-  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={name} S{season} E{episode}&cat=5000&limit=50&extended=1&o=json&apikey={apikey}`,
+  search: `${env.NEWZNAB_API_BASEURL}/api?t=search&q={name}%20S{season}%20E{episode}&cat=5000&limit=50&extended=1&o=json&apikey={apikey}`,
 };
 
 const generate_api_url = async (
@@ -92,7 +93,7 @@ const generate_api_url = async (
   if (type === "series") {
     try {
       const meta = await cinemeta.get(type, id.id);
-      const name = meta.name;
+      const name = (meta.name as string).replace(/'/g, "");
       const season =
         id.season && id.season < 10 ? "0" + id.season : `${id.season}`;
       const episode =
@@ -127,6 +128,7 @@ const parse_api_result = (
   imdb_id: string;
   title: string;
   quality?: keyof typeof Qualities | string; // TODO: figure out how to remove the | string
+  size: string;
   url: string;
 } => {
   const title = item.title;
@@ -142,11 +144,13 @@ const parse_api_result = (
     }
   }
   const url = item.link;
+  const size = filesize(+item.enclosure["@attributes"].length);
 
   return {
     imdb_id,
     title,
     quality,
+    size,
     url,
   };
 };
@@ -196,6 +200,8 @@ const getItems = async (
     const api_result = await get(type, id, apikey);
 
     if (!api_result) throw new NZBFetchGetError("No results");
+    if (api_result.channel.item?.length === 0)
+      throw new NZBFetchGetError("No results");
 
     return api_result.channel.item.map((item) => parse_api_result(item, id.id));
   } catch (error) {

@@ -117,6 +117,33 @@ const createTransfer = async (url: string, apikey: string) => {
   });
 };
 
+// Check if the user has the file already in their cloud.
+const cacheCheck = async (filename: string, apikey: string) => {
+  return api(`/cache/check?q=${filename}`, apikey);
+};
+
+const getFile = async (filename: string, apikey: string) => {
+  console.log(`searching for ${filename}`);
+  const folder = (await api(
+    `/folder/search?q=${filename}`,
+    apikey
+  )) as PremiumizeAPI_FolderList;
+
+  const folder_contents = (await api(
+    `/folder/list?id=${folder.content[0].id}`,
+    apikey
+  )) as PremiumizeAPI_FolderList;
+
+  const file = folder_contents.content.find((f) => {
+    const file_type = f.name.split(".").at(-1);
+    console.log({ f, file_type });
+    if (!file_type) return false;
+    return video_filetypes.includes(file_type);
+  });
+
+  return file;
+};
+
 const queryTransferCompletion = async (filename: string, apikey: string) => {
   console.log(`checking transfer status of ${filename}`);
   const transferList = (await api(
@@ -239,4 +266,5 @@ export const premiumize_api = {
   listTransfers,
   moveTransferAfterCompletion,
   waitForTransferCompletion,
+  getFile,
 };
