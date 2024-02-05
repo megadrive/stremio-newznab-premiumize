@@ -138,7 +138,8 @@ app.get("/p/:premiumize/:url", async (req, res) => {
   // serve the file babes
   if (!file) return res.status(404).send("");
 
-  return res.redirect(file.stream_link);
+  console.log(`redirecting to ${file.link}`);
+  return res.redirect(file.link);
 });
 
 export default app;
