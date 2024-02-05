@@ -32,10 +32,21 @@
       const installButton = (document.getElementById("install").onclick =
         generate_url);
 
+      const premiumize = document.getElementById("premiumize");
+      const newznab_key = document.getElementById("newznab_apikey");
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const provided = {
+        premiumize: searchParams.get("premiumize"),
+        newznab: searchParams.get("newznab"),
+      };
+      premiumize.value = provided.premiumize;
+      newznab_key.value = provided.newznab;
+
       function generate_url() {
         const settings = {
-          premiumize: document.getElementById("premiumize").value,
-          newznab_key: document.getElementById("newznab_apikey").value,
+          premiumize: premiumize.value,
+          newznab_key: newznab_key.value,
           newznab_provider: "nzbgeek",
         };
 

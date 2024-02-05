@@ -45,7 +45,13 @@ app.get("/", (req, res) => {
   return res.redirect("/configure");
 });
 
-app.get("/configure", (req, res) => {
+app.get("/:settings?/configure", (req, res) => {
+  if (req.params.settings) {
+    const parsed_settings = user_settings.decode(req.params.settings);
+    return res.redirect(
+      `/configure?premiumize=${parsed_settings.premiumize}&newznab=${parsed_settings.newznab_key}`
+    );
+  }
   return res.sendFile(join(__dirname, "/static/index.html"));
 });
 
@@ -75,7 +81,7 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
 
   const results = {
     streams: limited_results.map((result) => ({
-      name: `NZB2PM\n${result.quality}`,
+      name: `NZB2PM\n${result.quality ?? ""}`,
       title: result.title,
       description: `💾 ${result.size}`,
       url: `${env.BASE_URL}/p/${parsed_settings.premiumize}/${btoa(
