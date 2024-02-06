@@ -111,24 +111,28 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
   async function get_from_premiumize(): Promise<Stream[]> {
     const filename_to_find = await generate_filename(id);
 
-    const { filename, file } = await premiumize_api.getFile(
+    const files = await premiumize_api.getFile(
       filename_to_find,
       parsed_settings.premiumize
     );
 
-    if (!file) {
+    if (files.length === 0) {
       return [];
     }
 
-    const info = parse_torrent_title(filename);
+    const streams = files.map((f) => {
+      const info = parse_torrent_title(f.name);
 
-    const result = {
-      name: `[PGeek+]\n${info.resolution ?? ""}`,
-      description: `${filename}\n💾 ${filesize(file.size)}`,
-      url: `${env.BASE_URL}/cached/${btoa(file.stream_link)}`,
-    };
+      const result = {
+        name: `[PGeek+]\n${info.resolution ?? ""}`,
+        description: `${f.name}\n💾 ${filesize(info.size)}`,
+        url: `${env.BASE_URL}/cached/${btoa(f.stream_link)}`,
+      };
 
-    return [result];
+      return result;
+    });
+
+    return streams;
   }
 
   try {

@@ -46,34 +46,64 @@ const cacheCheck = async (filename: string, apikey: string) => {
 };
 
 const getFile = async (filename: string, apikey: string) => {
+  /*
+    Possibilities:
+    /Folder
+      /File.mp4
+
+    /Folder
+      .../
+      /File S01 E01.mp4
+      /File S01 E02.mp4
+    
+    /File S01 E01.mp4
+   */
+
   console.log(`searching for ${filename}`);
+
+  let files: PremiumizeAPI_FolderList["content"] = [];
+
   const folder = (await api(
     `/folder/search?q=${filename}`,
     apikey
   )) as PremiumizeAPI_FolderList;
 
-  console.log({ folder });
-
   if (folder.content.length === 0) {
-    throw new PremiumizeError("No folder content.");
+    throw new PremiumizeError("No found content.");
   }
 
-  const folder_contents = (await api(
-    `/folder/list?id=${folder.content[0].id}`,
-    apikey
-  )) as PremiumizeAPI_FolderList;
+  const filtered_files = folder.content.filter((item) => item.type === "file");
+  files = [...files, ...filtered_files];
+  const filtered_folders = folder.content.filter(
+    (item) => item.type === "folder"
+  );
 
-  const file = folder_contents.content.find((f) => {
-    const file_type = f.name.split(".").at(-1);
-    console.log({ f, file_type });
-    if (!file_type) return false;
-    return video_filetypes.includes(file_type);
-  });
+  console.log({ folder });
 
-  return {
-    filename,
-    file,
-  };
+  const folder_files = await Promise.all(
+    filtered_folders.map(async (filtered_folder) => {
+      const folder_contents = (await api(
+        `/folder/list?id=${filtered_folder.id}`,
+        apikey
+      )) as PremiumizeAPI_FolderList;
+
+      const file = folder_contents.content.find((f) => {
+        const file_type = f.name.split(".").at(-1);
+        console.log({ f, file_type });
+        if (!file_type) return false;
+        return video_filetypes.includes(file_type);
+      });
+
+      return {
+        filename,
+        file,
+      };
+    })
+  );
+
+  files = [...files, ...filtered_files];
+
+  return files;
 };
 
 const queryTransferCompletion = async (filename: string, apikey: string) => {
