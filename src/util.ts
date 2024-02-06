@@ -1,4 +1,4 @@
-import { type UserSettings } from "consts";
+import { type UserSettings } from "./consts";
 import nameToImdb from "name-to-imdb";
 import { promisify } from "util";
 export const name_to_imdb = promisify(nameToImdb);

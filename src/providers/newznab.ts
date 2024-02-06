@@ -1,20 +1,8 @@
-import { regex } from "../consts";
 import { env } from "../env";
 import { ParsedStremioID, regex_exec } from "../util";
 import { CinemetaError, cinemeta } from "./cinemeta";
 import { filesize } from "filesize";
-
-type TQualities = Record<
-  string,
-  ("4k" | "2160p" | "1080p" | "720p" | "480p" | "DVDRip" | "UHD" | "HD")[]
->;
-const Qualities: TQualities = {
-  "4k": ["4k", "2160p", "UHD"],
-  "1080p": ["1080p", "HD"],
-  "720p": ["720p"],
-  "480p": ["480p"],
-  DVDRIP: ["DVDRip"],
-};
+import { parse as parse_torrent_title } from "parse-torrent-title";
 
 type NewznabAPIInfo = {
   "@attributes": {
@@ -119,7 +107,6 @@ const fetch_headers = {
 
 /**
  * Parses the title for information
- * @param title The Newznab API provided title
  */
 const parse_api_result = (
   item: NewznabAPIItem,
@@ -127,22 +114,13 @@ const parse_api_result = (
 ): {
   imdb_id: string;
   title: string;
-  quality?: keyof typeof Qualities | string; // TODO: figure out how to remove the | string
+  quality?: string;
   size: string;
   url: string;
 } => {
   const title = item.title;
-  // const [quality] = regex_exec(regex.quality.exec(item.title), [0]);
-  let quality: keyof typeof Qualities | undefined = undefined;
-  for (const qual in Qualities) {
-    if (
-      Qualities[qual].some((q) => {
-        return title.toLowerCase().includes(q.toLowerCase());
-      })
-    ) {
-      quality = qual;
-    }
-  }
+  const parsed = parse_torrent_title(title);
+  const quality = parsed.resolution;
   const url = item.link;
   const size = filesize(+item.enclosure["@attributes"].length);
 
@@ -213,7 +191,7 @@ const limit = (
   items: ReturnType<typeof parse_api_result>[],
   opts: {
     limit_per_quality: number;
-    limit_qualities: (keyof typeof Qualities)[];
+    limit_qualities: string[];
     limit_languages: string[];
   } = {
     limit_per_quality: 2,
@@ -221,16 +199,7 @@ const limit = (
     limit_languages: [],
   }
 ) => {
-  const qualitiesFilter = (item: (typeof items)[0]) => {
-    return opts.limit_qualities.map((limited_quality) => {
-      return Qualities[limited_quality].some((q) => {
-        return item.quality?.includes(q);
-      });
-    });
-  };
-
-  const filtered = items.filter(qualitiesFilter);
-  return filtered;
+  return items;
 };
 
 export const newznab = {
