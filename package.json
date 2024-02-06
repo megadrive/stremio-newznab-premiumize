@@ -1,7 +1,7 @@
 {
   "name": "stremio-addon-premiumgeek",
   "version": "0.0.1",
-  "description": "Gets NZBs from a Newznab API and serves it to Premiumize.",
+  "description": "Downloads NZBs from NZBGeek to Premiumize, shows cached files as well.",
   "scripts": {
     "copy-static": "copyfiles \"static/*\" dist",
     "build": "tsc && npm run copy-static",
