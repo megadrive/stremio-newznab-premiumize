@@ -10,7 +10,7 @@ import {
   PremiumizeError,
 } from "./providers/premiumize.types";
 import { premiumize_api } from "./providers/premiumize";
-import { parse as parse_torrent_title } from "parse-torrent-title";
+import { parse as parse_release_title } from "parse-release-title";
 import { cinemeta } from "./providers/cinemeta";
 import { filesize } from "filesize";
 
@@ -125,7 +125,7 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
     }
 
     const streams = files.map((f) => {
-      const info = parse_torrent_title(f.name);
+      const info = parse_release_title(f.name);
 
       const result = {
         name: `[PGeek+]\n${info.resolution ?? ""}`,
