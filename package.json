@@ -4,7 +4,8 @@
   "description": "Gets NZBs from a Newznab API and serves it to Premiumize.",
   "scripts": {
     "copy-static": "copyfiles \"static/*\" dist",
-    "start": "tsc && npm run copy-static && node ./dist/server.js"
+    "build": "tsc && npm run copy-static",
+    "start": "npm run build && node ./dist/server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.8.1",
