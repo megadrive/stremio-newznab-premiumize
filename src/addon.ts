@@ -5,7 +5,10 @@ import { type Manifest } from "stremio-addon-sdk";
 import { newznab } from "./providers/newznab";
 import { generate_filename, parse_imdb_id, user_settings } from "./util";
 import { join } from "path";
-import { PremiumizeAPI_TransferCreate } from "./providers/premiumize.types";
+import {
+  PremiumizeAPI_TransferCreate,
+  PremiumizeError,
+} from "./providers/premiumize.types";
 import { premiumize_api } from "./providers/premiumize";
 import { parse as parse_torrent_title } from "parse-torrent-title";
 import { cinemeta } from "./providers/cinemeta";
@@ -110,8 +113,9 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
 
   async function get_from_premiumize(): Promise<Stream[]> {
     const filename_to_find = await generate_filename(id);
+    console.log(`checking premiumize store for ${id} / ${filename_to_find}`);
 
-    const files = await premiumize_api.getFile(
+    const files = await premiumize_api.findFiles(
       filename_to_find,
       parsed_settings.premiumize
     );
@@ -125,7 +129,7 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
 
       const result = {
         name: `[PGeek+]\n${info.resolution ?? ""}`,
-        description: `${f.name}\n💾 ${filesize(info.size)}`,
+        description: `${f.name}\n💾 ${filesize(f.size)}`,
         url: `${env.BASE_URL}/cached/${btoa(f.stream_link)}`,
       };
 
@@ -155,6 +159,13 @@ app.get("/:settings/stream/:type/:id.json", async (req, res) => {
       console.error(error);
     }
 
+    streams = streams.map((stream) => ({
+      ...stream,
+      proxyHeaders: {
+        "Cache-Control": "max-age: 90, immutable",
+      },
+    }));
+
     return res.json({ streams: streams });
   } catch (error) {
     console.error(error);
@@ -177,10 +188,12 @@ app.get("/cached/:url", async (req, res) => {
 });
 
 app.get("/nzb/:premiumize/:url", async (req, res) => {
-  try {
-    const apikey = req.params.premiumize;
-    const url = decodeURIComponent(atob(req.params.url)).replace(/&amp;/g, "&");
+  const apikey = req.params.premiumize;
+  const url = decodeURIComponent(atob(req.params.url)).replace(/&amp;/g, "&");
 
+  console.log(`[get] ${req.url}`);
+
+  try {
     console.log(`Creating a transfer for ${url}`); // @TODO: remove apikeys from console logs
 
     // create a transfer
@@ -193,8 +206,9 @@ app.get("/nzb/:premiumize/:url", async (req, res) => {
 
     // follow the transfer status
     console.log("WAIT FOR COMPLETION");
+    let complete;
     try {
-      const complete = await premiumize_api.waitForTransferCompletion(
+      complete = await premiumize_api.waitForTransferCompletion(
         createTransfer.name,
         apikey
       );
@@ -207,20 +221,22 @@ app.get("/nzb/:premiumize/:url", async (req, res) => {
     }
 
     // once complete, do after-complete stuff
-    // console.log("MOVE TRANSFER");
-    // const file = await premiumize_api.moveTransferAfterCompletion(
-    //   createTransfer.name,
-    //   apikey
-    // );
+    if (!complete) throw new PremiumizeError("Not complete");
 
     console.log("GET MOVIE FILE");
-    const { file } = await premiumize_api.getFile(createTransfer.name, apikey);
+    let file = await premiumize_api.getFile(complete.folder_id, apikey);
+    if (!file) {
+      console.log(`couldn't find a video file in ${complete.folder_id}`);
+      return res.status(404).send("no file");
+    }
+
+    console.log(`Got file`, file);
 
     // serve the file babes
     if (!file) return res.status(404).send("");
 
-    console.log(`redirecting to ${file.link}`);
-    return res.redirect(file.link);
+    console.log(`redirecting to ${file.stream_link}`);
+    return res.redirect(file.stream_link);
   } catch (error) {
     console.error(error);
     return res.status(500).send("error occurred");

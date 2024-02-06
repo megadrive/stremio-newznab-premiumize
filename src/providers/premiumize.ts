@@ -1,6 +1,6 @@
 import { video_filetypes } from "../consts";
 import { env } from "../env";
-import { retryAsync } from "ts-retry";
+import { retryAsync, retryAsyncUntilTruthy } from "ts-retry";
 import {
   PremiumizeAPI_FolderList,
   PremiumizeError,
@@ -45,7 +45,32 @@ const cacheCheck = async (filename: string, apikey: string) => {
   return api(`/cache/check?q=${filename}`, apikey);
 };
 
-const getFile = async (filename: string, apikey: string) => {
+const getFile = async (id: string, apikey: string) => {
+  console.log(`Getting file: ${id}`);
+
+  const files = (await api(
+    `/folder/list?id=${id}`,
+    apikey
+  )) as PremiumizeAPI_FolderList;
+
+  console.log(files);
+
+  const videos = files.content.filter((file) => {
+    if (file.type === "folder") return false;
+    const filetype = file.name.split(".").at(-1);
+    if (!filetype) return false;
+
+    return video_filetypes.includes(filetype);
+  });
+
+  if (videos.length === 0) {
+    return null;
+  }
+
+  return videos[0];
+};
+
+const findFiles = async (filename: string, apikey: string) => {
   /*
     Possibilities:
     /Folder
@@ -94,10 +119,11 @@ const getFile = async (filename: string, apikey: string) => {
         return video_filetypes.includes(file_type);
       });
 
-      return {
-        filename,
-        file,
-      };
+      if (!file) return undefined;
+
+      file.name = filename;
+
+      return file;
     })
   );
 
@@ -122,23 +148,34 @@ const queryTransferCompletion = async (filename: string, apikey: string) => {
   if (!transfer)
     throw new PremiumizeError(`Couldn't find transfer: ${filename}`);
 
-  return transfer.status;
+  return transfer;
 };
 
 const waitForTransferCompletion = async (filename: string, apikey: string) => {
   try {
-    const result = await retryAsync<string>(
-      () => queryTransferCompletion(filename, apikey),
-      {
-        maxTry: 30,
-        delay: 3000,
-        until: (last_result) => ["finished", "error"].includes(last_result),
-      }
-    );
+    const timeout = 1000 * 60 * 10; // 10 minutes
+    const attempts = Math.ceil(timeout / 5000); // 5 seconds delay between attempts
+    const result = await retryAsync<
+      Awaited<ReturnType<typeof queryTransferCompletion>>
+    >(() => queryTransferCompletion(filename, apikey), {
+      maxTry: attempts,
+      delay: 5000,
+      until: (
+        last_result: Awaited<ReturnType<typeof queryTransferCompletion>>
+      ) => {
+        if (last_result === null) return false;
+        if (last_result.status === "error") return false;
+        if (last_result.file_id || last_result.folder_id) return true;
+        if (last_result.status === "success") return true;
+
+        return false;
+      },
+    });
 
     return result;
   } catch (error) {
     console.log(error);
+    return null;
   }
 };
 
@@ -233,5 +270,7 @@ export const premiumize_api = {
   listTransfers,
   // moveTransferAfterCompletion,
   waitForTransferCompletion,
+
   getFile,
+  findFiles,
 };
