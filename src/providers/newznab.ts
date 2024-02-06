@@ -2,7 +2,7 @@ import { env } from "../env";
 import { ParsedStremioID, regex_exec } from "../util";
 import { CinemetaError, cinemeta } from "./cinemeta";
 import { filesize } from "filesize";
-import { parse as parse_torrent_title } from "parse-torrent-title";
+import { parse as parse_release_title } from "parse-release-title";
 
 type NewznabAPIInfo = {
   "@attributes": {
@@ -119,7 +119,7 @@ const parse_api_result = (
   url: string;
 } => {
   const title = item.title;
-  const parsed = parse_torrent_title(title);
+  const parsed = parse_release_title(title);
   const quality = parsed.resolution;
   const url = item.link;
   const size = filesize(+item.enclosure["@attributes"].length);
