@@ -1,6 +1,8 @@
 import { type UserSettings } from "./consts";
 import nameToImdb from "name-to-imdb";
+import { type } from "os";
 import { promisify } from "util";
+import { cinemeta } from "./providers/cinemeta";
 export const name_to_imdb = promisify(nameToImdb);
 
 /**
@@ -31,6 +33,21 @@ export const parse_imdb_id = (imdb_id: string): ParsedStremioID => {
   if (season) rv.season = +season;
   if (episode) rv.episode = +episode;
   return rv;
+};
+
+export const generate_filename = async (imdb_id: string): Promise<string> => {
+  const info = parse_imdb_id(imdb_id);
+
+  const meta = await cinemeta.get(info.type, imdb_id);
+
+  // remove non alphanumeric
+  const name = meta.name.replace(/[^A-Za-z0-9 \.]/g, "");
+  const season = `S${info.season && info.season < 10 ? "0" : ""}${info.season}`;
+  const episode = `E${info.episode && info.episode < 10 ? "0" : ""}${
+    info.episode
+  }`;
+
+  return [name, season, episode].join(" ");
 };
 
 export const user_settings = {

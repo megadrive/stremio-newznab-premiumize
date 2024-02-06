@@ -70,7 +70,10 @@ const getFile = async (filename: string, apikey: string) => {
     return video_filetypes.includes(file_type);
   });
 
-  return file;
+  return {
+    filename,
+    file,
+  };
 };
 
 const queryTransferCompletion = async (filename: string, apikey: string) => {
